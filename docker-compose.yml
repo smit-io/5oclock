@@ -1,12 +1,14 @@
 services:
   5oclock:
-    image: ghcr.io/smit-io/5oclock:latest
-    container_name: 5oclock_smaller
+    image: 5oclock:user
+    container_name: 5oclock_user
     ports:
       - "8000:8000"
     environment:
       - POP_LIMIT=15000
       - TARGET_24H=17
+      - UID=1000
+      - GID=999
     volumes:
       # Using Named Volumes instead of relative paths
       - geonames_data:/app/geonames
