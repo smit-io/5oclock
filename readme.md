@@ -10,7 +10,19 @@ The easiest way to get the project running is using the provided Docker configur
 2. **Launch with Docker Compose:**
 
 ```bash
-docker-compose up --build
+services:
+  5oclock:
+    image: ghcr.io/smit-io/5oclock:latest
+    container_name: five_oclock_app
+    ports:
+      - "8000:8000"
+    environment:
+      - TARGET_24H=17
+      - POP_LIMIT=500
+    restart: unless-stopped
+volumes:
+  geonames_data:
+  output_data:
 ```
 
 3. **Access the App:**
