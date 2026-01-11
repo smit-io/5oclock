@@ -4,17 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>It's 5 O'Clock Somewhere</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS CDN for development-->
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="./templates/style.css">
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .transition-all { transition: all 0.5s ease; }
-        .clock-pulse { animation: pulse-subtle 1s infinite; }
-        @keyframes pulse-subtle {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
+        @font-face {
+        font-family: 'Inter';
+        src: url('./templates/fonts/InterVariable.woff2') format('truetype');
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: swap;
         }
-    </style>
+        body {
+        font-family: 'Inter', sans-serif;
+        }
+</style>
+
 </head>
 <body class="bg-white text-black dark:bg-zinc-950 dark:text-zinc-100 h-screen flex items-center justify-center p-6 transition-all">
 
