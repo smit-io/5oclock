@@ -1,0 +1,22 @@
+# Exclude raw data and generated database
+geonames/
+cities/
+output/
+
+# Exclude Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Exclude environment files and git
+.git
+.gitignore
+.env
+venv/
+.vscode/
+.devcontainer/
+
+# Ignore macOS system files
+.DS_Store
