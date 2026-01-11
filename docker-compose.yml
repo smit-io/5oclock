@@ -1,9 +1,9 @@
 services:
   5oclock:
-    image: 5oclock:latest
-    container_name: 5oclock
+    image: ghcr.io/smit-io/5oclock:latest
+    container_name: 5oclock_smaller
     ports:
-      - "9000:8000"
+      - "8000:8000"
     environment:
       - POP_LIMIT=15000
       - TARGET_24H=17
