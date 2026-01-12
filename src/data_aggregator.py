@@ -11,6 +11,7 @@ import shutil
 import random
 from collections import defaultdict
 from .constants import DATA_DIR, OUTPUT_DIR, CITIES_URL, ADMIN_URL, CITIES_FILE, ADMIN_FILE, DB_PATH
+import sqlite3, json, os
 
 def download_geonames(force=False):
     """Downloads raw files. If force=True, replaces existing files."""
@@ -143,90 +144,90 @@ def populate_database(json_data, db_path):
     conn.commit()
     conn.close()
     
-def get_matching_iana_ids(cursor, target_hour):
-    """Finds all IANA primary keys whose current local time matches the target hour."""
-    cursor.execute("SELECT id, timezone_id FROM iana_timezones")
-    all_tzs = cursor.fetchall()
-    
-    now_utc = datetime.now(timezone.utc)
-    matching_ids = []
-    
-    for db_id, tz_str in all_tzs:
-        try:
-            # Calculate local hour for this specific TZ right now
-            local_hour = now_utc.astimezone(ZoneInfo(tz_str)).hour
-            if local_hour == target_hour:
-                matching_ids.append(db_id)
-        except Exception:
-            continue
-            
-    return matching_ids
+def build_world_cities_db(json_path="world_cities.json", db_path="world_cities.db"):
 
-def get_all_cities(target_hour, min_pop, db_path):
+    # Load JSON (accepts list or dict-of-lists keyed by timezone)
+    with open(json_path, "r", encoding="utf-8") as f:
+        src = json.load(f)
+
+    cities = []
+    if isinstance(src, dict):
+        for tz, items in src.items():
+            for it in items:
+                if isinstance(it, dict):
+                    if "iana_timezone" not in it or not it.get("iana_timezone"):
+                        it["iana_timezone"] = tz
+                    cities.append(it)
+    elif isinstance(src, list):
+        cities = src
+    else:
+        raise ValueError("Unsupported JSON structure for world_cities.json")
+
+    # Create DB and schema
     conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    tz_ids = get_matching_iana_ids(cursor, target_hour)
-    if not tz_ids: return []
+    cur = conn.cursor()
+    cur.execute("PRAGMA foreign_keys = ON")
 
-    placeholders = ','.join(['?'] * len(tz_ids))
-    query = f"""
-        SELECT l.city, l.state, l.country, l.population, t.timezone_id
-        FROM locations l
-        JOIN iana_timezones t ON l.iana_id = t.id
-        WHERE l.iana_id IN ({placeholders}) AND l.population >= ?
-        ORDER BY l.population DESC
-    """
-    cursor.execute(query, (*tz_ids, min_pop))
-    return cursor.fetchall()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS iana_timezones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timezone TEXT UNIQUE
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT,
+            state TEXT,
+            state_abbrev TEXT,
+            country TEXT,
+            country_abbrev TEXT,
+            population INTEGER,
+            lat REAL,
+            lng REAL,
+            iana_timezone INTEGER,
+            FOREIGN KEY (iana_timezone) REFERENCES iana_timezones(id)
+        )
+    """)
+    conn.commit()
 
-def get_all_cities_recursive(target_hour, min_pop, db_path, floor=500):
-    """Recursively drops population by 10% until cities are found."""
-    cities = get_all_cities(target_hour, min_pop, db_path)
-    
-    if not cities and min_pop > floor:
-        new_pop = int(min_pop * 0.9)
-        return get_all_cities_recursive(target_hour, new_pop, db_path, floor)
-    
-    return cities, min_pop
+    # Insert unique timezones
+    tzs = {c.get("iana_timezone") for c in cities if c.get("iana_timezone")}
+    cur.executemany("INSERT OR IGNORE INTO iana_timezones (timezone) VALUES (?)", ((tz,) for tz in tzs))
+    conn.commit()
 
-def get_random_city(target_hour, min_pop, db_path):
-    """Gets a random city using the OFFSET method for O(1) performance."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # 1. Get current matching timezones
-    tz_ids = get_matching_iana_ids(cursor, target_hour)
-    if not tz_ids: return None, min_pop
+    # Build timezone lookup
+    cur.execute("SELECT id, timezone FROM iana_timezones")
+    tz_lookup = {tz: id for id, tz in cur.fetchall()}
 
-    # 2. Recursive population check (Get count first)
-    current_pop = min_pop
-    total_count = 0
-    placeholders = ','.join(['?'] * len(tz_ids))
-    
-    while total_count == 0 and current_pop >= 500:
-        cursor.execute(f"SELECT COUNT(*) FROM locations WHERE iana_id IN ({placeholders}) AND population >= ?", (*tz_ids, current_pop))
-        total_count = cursor.fetchone()[0]
-        if total_count == 0:
-            current_pop = int(current_pop * 0.9)
+    # Normalize and insert city rows
+    def safe_int(v):
+        try: return int(v)
+        except: return 0
+    def safe_float(v):
+        try: return float(v)
+        except: return 0.0
 
-    if total_count == 0: return None, current_pop
+    rows = []
+    for c in cities:
+        tz_id = tz_lookup.get(c.get("iana_timezone"))
+        rows.append((
+            c.get("city"),
+            c.get("state") or c.get("province") or "",
+            c.get("state_abbrev") or c.get("state_code") or "",
+            c.get("country"),
+            c.get("country_abbrev") or c.get("country_code") or "",
+            safe_int(c.get("population") or c.get("pop")),
+            safe_float(c.get("lat") or c.get("latitude")),
+            safe_float(c.get("lng") or c.get("lon") or c.get("longitude")),
+            tz_id
+        ))
 
-    # 3. Pick a random index and fetch
-    random_index = random.randint(0, total_count - 1)
-    query = f"""
-        SELECT l.city, l.state, l.country, l.population, t.timezone_id
-        FROM locations l
-        JOIN iana_timezones t ON l.iana_id = t.id
-        WHERE l.iana_id IN ({placeholders}) AND l.population >= ?
-        LIMIT 1 OFFSET ?
-    """
-    cursor.execute(query, (*tz_ids, current_pop, random_index))
-    result = cursor.fetchone()
-    
-    # Format result to dict for FastAPI
-    city_dict = {
-        "city": result[0], "state": result[1], "country": result[2],
-        "population": result[3], "timezone_id": result[4]
-    }
-    return city_dict, current_pop
+    cur.executemany("""
+        INSERT INTO cities (city, state, state_abbrev, country, country_abbrev, population, lat, lng, iana_timezone)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, rows)
+    conn.commit()
+    conn.close()
+
+    print(f"✅ Created {os.path.abspath(db_path)} ({len(rows)} cities, {len(tzs)} timezones)")
