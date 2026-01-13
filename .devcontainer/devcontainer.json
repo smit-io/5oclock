@@ -27,7 +27,8 @@
 				"ms-python.debugpy",
 				"ritwickdey.LiveServer",
 				"samuelcolvin.jinjahtml",
-				"donjayamanne.python-extension-pack"
+				"donjayamanne.python-extension-pack",
+				"ecmel.vscode-html-css"
 			]
 		}
 	},
