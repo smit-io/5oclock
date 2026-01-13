@@ -47,15 +47,15 @@ def main():
         
     initialize_pipeline(force=force_flag)
     
-    target_hour = 17 
-    cities = get_cities_from_best_hour_match(target_hour, city_limit=100)
+    # target_hour = 17 
+    # cities = get_cities_from_best_hour_match(target_hour, city_limit=100)
 
-    if cities:
-        export_list_to_json(
-            cities, 
-            filename=f"best_match_hour_{target_hour}", 
-            force=True
-        )
+    # if cities:
+    #     export_list_to_json(
+    #         cities, 
+    #         filename=f"best_match_hour_{target_hour}", 
+    #         force=True
+    #     )
 
 if __name__ == "__main__":
     main()
