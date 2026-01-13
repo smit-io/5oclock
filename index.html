@@ -1,32 +1,97 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>City Clock</title>
+    <title>City Clock - Local DB</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
     <style>
-        body { margin: 0; background: #050505; color: white; font-family: 'Inter', sans-serif; 
+        body { margin: 0; background: #050505; color: white; font-family: sans-serif; 
                display: flex; justify-content: center; align-items: center; height: 100vh; }
         #container { text-align: center; transition: opacity 1s; opacity: 1; }
-        .city { font-size: clamp(3rem, 10vw, 8rem); font-weight: 900; letter-spacing: -2px; line-height: 1; }
+        .city { font-size: clamp(3rem, 10vw, 8rem); font-weight: 900; letter-spacing: -2px; }
         .country { font-size: 1.5rem; color: #666; margin-top: 1rem; text-transform: uppercase; letter-spacing: 4px; }
         .clock { font-size: 1.2rem; margin-top: 2rem; font-family: monospace; color: #444; }
         .fade-out { opacity: 0; }
+        #status { position: fixed; bottom: 10px; font-size: 0.7rem; color: #333; }
     </style>
 </head>
 <body>
     <div id="container">
-        <div class="city" id="city">--</div>
-        <div class="country" id="country">--</div>
+        <div class="city" id="city">LOADING DB...</div>
+        <div class="country" id="country">PLEASE WAIT</div>
         <div class="clock" id="clock">00:00:00</div>
     </div>
+    <div id="status">Status: Initializing...</div>
 
     <script>
+        let db = null;
         let cities = [];
         let index = 0;
         const targetHour = new URLSearchParams(window.location.search).get('target_hour') || 17;
 
-        async function fetchData() {
-            const res = await fetch(`/api/cities?target_hour=${targetHour}`);
-            cities = await res.json();
+        async function initDB() {
+            try {
+                const sqlPromise = initSqlJs({ locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` });
+                const dataPromise = fetch('/cities.db').then(res => res.arrayBuffer());
+                const [SQL, buf] = await Promise.all([sqlPromise, dataPromise]);
+                
+                db = new SQL.Database(new Uint8Array(buf));
+                document.getElementById('status').innerText = "Status: Database Loaded";
+                
+                refreshCityList();
+                setInterval(refreshCityList, 60000);
+                setInterval(updateDisplay, 10000);
+                setInterval(updateLiveClock, 1000);
+            } catch (err) {
+                document.getElementById('city').innerText = "DB ERROR";
+                console.error(err);
+            }
+        }
+
+        function refreshCityList() {
+            if (!db) return;
+
+            // 1. Find all IANA timezones where it's currently the target hour
+            // We do this by checking offsets in JS
+            const now = new Date();
+            const matchingTimezones = [];
+
+            // We query the distinct timezones from the DB
+            const res = db.exec("SELECT tz FROM iana_timezones");
+            const allTzs = res[0].values.map(v => v[0]);
+
+            allTzs.forEach(tz => {
+                try {
+                    const localHour = new Intl.DateTimeFormat('en-GB', {
+                        hour: 'numeric', hour12: false, timeZone: tz
+                    }).format(now);
+
+                    if (parseInt(localHour) === parseInt(targetHour)) {
+                        matchingTimezones.push(tz);
+                    }
+                } catch(e) {}
+            });
+
+            if (matchingTimezones.length === 0) return;
+
+            // 2. Query the database for cities in those timezones
+            const placeholders = matchingTimezones.map(() => '?').join(',');
+            const stmt = db.prepare(`
+                SELECT c.name, c.country, t.tz 
+                FROM cities c
+                JOIN iana_timezones t ON c.tz_id = t.id 
+                WHERE t.tz IN (${placeholders})
+                ORDER BY RANDOM()
+                LIMIT 100
+            `);
+            
+            cities = [];
+            stmt.bind(matchingTimezones);
+            while(stmt.step()) {
+                const row = stmt.getAsObject();
+                cities.push(row);
+            }
+            stmt.free();
+
             if (cities.length > 0 && index === 0) updateDisplay();
         }
 
@@ -44,19 +109,17 @@
             }, 1000);
         }
 
-        function updateClocks() {
+        function updateLiveClock() {
             if (cities.length === 0) return;
-            // Real-time local clock calculation
             const city = cities[(index - 1) % cities.length];
-            const now = new Date();
-            const localStr = now.toLocaleTimeString('en-GB', { timeZone: city.timezone });
-            document.getElementById('clock').innerText = `${localStr} ${city.tz_abbr}`;
+            const options = { 
+                hour: '2-digit', minute: '2-digit', second: '2-digit', 
+                timeZone: city.tz, timeZoneName: 'short' 
+            };
+            document.getElementById('clock').innerText = new Intl.DateTimeFormat('en-GB', options).format(new Date());
         }
 
-        fetchData();
-        setInterval(fetchData, 60000); // Refresh data every minute
-        setInterval(updateDisplay, 10000); // Rotate city every 10s
-        setInterval(updateClocks, 1000); // Update clock every second
+        initDB();
     </script>
 </body>
 </html>

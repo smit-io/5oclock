@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import zoneinfo
 import sqlite3
 import os
+from fastapi.responses import FileResponse
 
 from src.constants import DB_NAME
 from src.downloader import sync_data
@@ -21,6 +22,12 @@ async def startup_event():
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
     return FileResponse('index.html')
+
+@app.get("/cities.db")
+async def get_db_file():
+    if os.path.exists(DB_NAME):
+        return FileResponse(DB_NAME)
+    return {"error": "DB not found"}
 
 @app.get("/api/cities")
 async def get_cities(target_hour: int = 17):
