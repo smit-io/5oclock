@@ -90,50 +90,54 @@ def export_list_to_json(data: List[Tuple], filename: Optional[str] = None, force
 
 #     print("Bulk export complete.")
     
-def export_all_timezones_to_json(limit_per_tz: Optional[int] = None, force: bool = False):
+def export_all_timezones_to_json(force: bool = False):
     """
-    Uses a JOIN to match cities to their IANA timezone name via the foreign key ID.
+    Exports cities to individual JSON files by timezone.
+    Uses the foreign key relationship to ensure data accuracy.
     """
     conn = sqlite3.connect(CITIES_DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # 1. Fetch all timezones from the lookup table
-    # We fetch both the ID and the name to perform an efficient join
+    # 1. Get all timezones that actually HAVE cities linked to them
     cursor.execute("SELECT id, timezone_name FROM iana_timezones")
     timezones = cursor.fetchall()
 
-    print(f"🚀 Starting bulk JSON export for {len(timezones)} timezones...")
+    if not os.path.exists(JSON_DIR):
+        os.makedirs(JSON_DIR)
 
-    for tz in tqdm(timezones, desc="Exporting JSONs", unit="tz"):
+    print(f"📦 Exporting JSONs for {len(timezones)} timezones...")
+
+    for tz in tqdm(timezones):
         tz_id = tz['id']
         tz_name = tz['timezone_name']
         
-        clean_filename = sanitize_table_name(tz_name).replace("tz_", "")
-        file_path = os.path.join(JSON_DIR, f"{clean_filename}.json")
+        # Consistent naming: America/New_York -> america_new_york.json
+        clean_name = sanitize_table_name(tz_name).replace("tz_", "")
+        file_path = os.path.join(JSON_DIR, f"{clean_name}.json")
 
         if os.path.exists(file_path) and not force:
             continue
 
-        # 2. Query cities using the numeric foreign key 'timezone_id'
-        query = """
-            SELECT name, state, country, population, latitude, longitude 
+        # 2. Get cities using the FOREIGN KEY (tz_id)
+        # We also filter out any potential header row artifacts here (name != 'name')
+        cursor.execute("""
+            SELECT name, state, country, population, latitude, longitude
             FROM cities 
-            WHERE timezone_id = ? 
+            WHERE timezone_id = ? AND name != 'name'
             ORDER BY population DESC
-        """
+        """, (tz_id,))
         
-        if limit_per_tz:
-            query += f" LIMIT {limit_per_tz}"
+        # Fetch rows and convert to list of dictionaries
+        cities_list = [dict(row) for row in cursor.fetchall()]
 
-        cursor.execute(query, (tz_id,))
-        cities_data = [dict(row) for row in cursor.fetchall()]
-        
-        if cities_data:
-            export_list_to_json(cities_data, filename=clean_filename, force=force)
+        # 3. Save only if data exists
+        if cities_list:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(cities_list, f, indent=2, ensure_ascii=False)
 
     conn.close()
-    print("\n✅ Bulk export complete.")
+    print("✅ Export complete.")
 
 # def export_all_timezones_to_json(limit_per_tz: int = None, force: bool = False):
 #     """
