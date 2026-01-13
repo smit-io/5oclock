@@ -1,7 +1,7 @@
 import sys
 from src.constants import FILES_TO_DOWNLOAD, FORCE_UPDATE
 from src.downloader import sync_all_datasets
-from src.database import import_data
+from src.database import import_data, create_indexes
 from src.processor import (
     get_cities_from_best_hour_match,
     process_refined_data, 
@@ -27,6 +27,7 @@ def initialize_pipeline(force: bool = False):
     # 3. Build Refined cities.db (Joins and cleans data)
     print("\n[Step 3/5] Generating refined cities.db (Master Tables)...")
     process_refined_data()
+    create_indexes()
 
     # 4. Create Partitioned Timezone Tables
     print("\n[Step 4/5] Creating individual tables for each timezone...")

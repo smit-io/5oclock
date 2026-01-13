@@ -1,6 +1,6 @@
 import sqlite3
 import csv
-from src.constants import GEONAMES_DB_PATH, INPUT_DIR, SCHEMAS, FILES_TO_DOWNLOAD, FORCE_UPDATE
+from src.constants import GEONAMES_DB_PATH, INPUT_DIR, SCHEMAS, FILES_TO_DOWNLOAD, FORCE_UPDATE, CITIES_DB_PATH
 
 def should_update_db() -> bool:
     """
@@ -69,3 +69,16 @@ def import_data():
     conn.commit()
     conn.close()
     print(f"Database successfully updated at: {GEONAMES_DB_PATH}")
+    
+def create_indexes():
+    conn = sqlite3.connect(CITIES_DB_PATH)
+    cursor = conn.cursor()
+    
+    print("Creating database indexes for speed...")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pop ON cities(population DESC)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tz ON cities(timezone_id)")
+    cursor.execute("CREATE INDEX idx_cities_display_search ON cities(population, name, country);")
+    
+    conn.commit()
+    conn.close()
+    print("✅ Indexes created.")
