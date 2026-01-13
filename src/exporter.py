@@ -92,53 +92,48 @@ def export_list_to_json(data: List[Tuple], filename: Optional[str] = None, force
     
 def export_all_timezones_to_json(limit_per_tz: Optional[int] = None, force: bool = False):
     """
-    Iterates through all timezones and exports data from the master 'cities' table.
-    Uses the idx_cities_timezone index for high performance.
+    Uses a JOIN to match cities to their IANA timezone name via the foreign key ID.
     """
     conn = sqlite3.connect(CITIES_DB_PATH)
-    # Allows us to handle results as dictionaries
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # 1. Get the list of all valid timezones to process
-    cursor.execute("SELECT timezone_name FROM iana_timezones")
-    timezones = [row[0] for row in cursor.fetchall()]
+    # 1. Fetch all timezones from the lookup table
+    # We fetch both the ID and the name to perform an efficient join
+    cursor.execute("SELECT id, timezone_name FROM iana_timezones")
+    timezones = cursor.fetchall()
 
     print(f"🚀 Starting bulk JSON export for {len(timezones)} timezones...")
 
-    # 2. Iterate through each timezone and query the indexed master table
-    for tz_name in tqdm(timezones, desc="Exporting JSONs", unit="tz"):
+    for tz in tqdm(timezones, desc="Exporting JSONs", unit="tz"):
+        tz_id = tz['id']
+        tz_name = tz['timezone_name']
         
-        # Define the output filename based on your previous logic
-        # Result: "tz_america_new_york" -> "america_new_york"
         clean_filename = sanitize_table_name(tz_name).replace("tz_", "")
         file_path = os.path.join(JSON_DIR, f"{clean_filename}.json")
 
-        # Skip if file exists and force is False
         if os.path.exists(file_path) and not force:
             continue
 
-        # 3. Query the master 'cities' table directly
+        # 2. Query cities using the numeric foreign key 'timezone_id'
         query = """
-            SELECT name, state, country, population, latitude, longitude, timezone_id 
+            SELECT name, state, country, population, latitude, longitude 
             FROM cities 
-            WHERE timezone_id = ?
+            WHERE timezone_id = ? 
             ORDER BY population DESC
         """
         
         if limit_per_tz:
             query += f" LIMIT {limit_per_tz}"
 
-        cursor.execute(query, (tz_name,))
-        
-        # Convert sqlite3.Row objects to list of dicts for JSON
+        cursor.execute(query, (tz_id,))
         cities_data = [dict(row) for row in cursor.fetchall()]
         
         if cities_data:
-            # Reusing your existing helper to save the file
             export_list_to_json(cities_data, filename=clean_filename, force=force)
 
     conn.close()
+    print("\n✅ Bulk export complete.")
 
 # def export_all_timezones_to_json(limit_per_tz: int = None, force: bool = False):
 #     """
