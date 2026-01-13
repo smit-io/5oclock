@@ -60,7 +60,8 @@ async def top_cities(limit: int = 100):
 async def cities_by_tz(tz_name: str, limit: Optional[int] = None):
     """Returns cities in a specific timezone (e.g., /cities/timezone/America/New_York)."""
     # Using :path allows slashes in the URL parameter
-    data = get_cities_from_tz_table(tz_name, limit=limit)
+    # data = get_cities_from_tz_table(tz_name, limit=limit)
+    data = get_cities_by_timezone(tz_name, limit=limit)
     if not data:
         raise HTTPException(status_code=404, detail="Timezone not found or no cities available")
     return data

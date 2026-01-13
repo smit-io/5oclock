@@ -32,6 +32,7 @@
     <div id="city-container" class="text-center city-fade visible-opacity h-64 flex flex-col justify-center">
         <h1 id="city-name" class="text-6xl md:text-9xl font-black tracking-tighter leading-none">Loading...</h1>
         <p id="location-detail" class="text-xl md:text-2xl font-medium text-gray-500 dark:text-zinc-400 mt-6 uppercase tracking-widest"></p>
+        <p id="city-population" class="text-sm md:text-2sm font-medium text-gray-500 dark:text-zinc-400 mt-6 uppercase tracking-widest"></p>
     </div>
 
     <div class="text-center pt-10 border-t border-gray-100 dark:border-zinc-900 w-72 mt-8">
@@ -152,6 +153,7 @@
                 const city = cities[currentIndex];
                 document.getElementById('city-name').innerText = city.name;
                 document.getElementById('location-detail').innerText = city.country;
+                document.getElementById('city-population').innerText = city.population ? `Population: ${city.population.toLocaleString()}` : '';
                 currentIndex = (currentIndex + 1) % cities.length;
                 container.classList.replace('hidden-opacity', 'visible-opacity');
                 updateSocialLinks(city);
