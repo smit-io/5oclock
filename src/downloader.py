@@ -1,41 +1,65 @@
-import os
-import requests
 import zipfile
-import shutil
+import requests
+import os
 from datetime import datetime
-from src.constants import GEONAMES_URLS, FILES, DATA_DIR, FORCE_REBUILD
+from pathlib import Path
+from src.constants import BASE_URL, INPUT_DIR
 
-def get_remote_mtime(url):
-    try:
-        response = requests.head(url, timeout=5)
-        last_modified = response.headers.get('Last-Modified')
-        if last_modified:
-            return datetime.strptime(last_modified, '%a, %d %b %Y %H:%M:%S %Z').timestamp()
-    except:
-        pass
-    return 0
+def get_remote_last_modified(url: str) -> datetime:
+    """Fetches the Last-Modified header from the server."""
+    response = requests.head(url, allow_redirects=True)
+    response.raise_for_status()
+    last_modified_str = response.headers.get('Last-Modified')
+    if last_modified_str:
+        return datetime.strptime(last_modified_str, '%a, %d %b %Y %H:%M:%S %Z')
+    return None
 
-def download_file(url, dest):
-    print(f"Downloading {url}...")
-    response = requests.get(url, stream=True)
-    with open(dest, 'wb') as f:
-        shutil.copyfileobj(response.raw, f)
-
-def sync_data():
-    if FORCE_REBUILD and os.path.exists(DATA_DIR):
-        print("FORCE_REBUILD is True. Cleaning data directory...")
-        shutil.rmtree(DATA_DIR)
+def extract_zip(file_path: Path):
+    """Extracts a zip file to the same directory and removes the zip file."""
+    print(f"Extracting {file_path.name}...")
+    with zipfile.ZipFile(file_path, 'r') as zip_ref:
+        zip_ref.extractall(file_path.parent)
     
-    os.makedirs(DATA_DIR, exist_ok=True)
+    # Optional: Remove the zip after extraction to keep storage clean
+    # file_path.unlink() 
+    print(f"Extraction complete for {file_path.name}")
 
-    for key, url in GEONAMES_URLS.items():
-        local_path = FILES["cities_txt"] if key == "cities" else FILES[key]
-        zip_path = FILES["cities_zip"] if key == "cities" else None
+def download_geonames_file(filename: str, force: bool = False):
+    url = f"{BASE_URL}{filename}"
+    local_path = INPUT_DIR / filename
+    
+    exists = local_path.exists()
+    should_download = force or not exists
+    
+    if exists and not force:
+        remote_date = get_remote_last_modified(url)
+        local_date = datetime.fromtimestamp(local_path.stat().st_mtime)
         
-        if not os.path.exists(local_path) or get_remote_mtime(url) > os.path.getmtime(local_path):
-            target = zip_path if zip_path else local_path
-            download_file(url, target)
-            if zip_path:
-                with zipfile.ZipFile(zip_path, 'r') as z:
-                    z.extractall(DATA_DIR)
-                os.remove(zip_path)
+        if remote_date and remote_date > local_date:
+            print(f"Update available for {filename}...")
+            should_download = True
+        else:
+            print(f"{filename} is already up to date.")
+
+    if should_download:
+        print(f"Downloading {filename}...")
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        
+        with open(local_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+        # New: Automatically extract if it's a ZIP file
+        if local_path.suffix == '.zip':
+            extract_zip(local_path)
+            
+        print(f"Successfully processed {filename}")
+
+def sync_all_datasets(files_dict: dict, force: bool = False):
+    """Loops through the required files and syncs them."""
+    for key, filename in files_dict.items():
+        try:
+            download_geonames_file(filename, force=force)
+        except Exception as e:
+            print(f"Failed to download {filename}: {e}")

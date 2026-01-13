@@ -24,7 +24,10 @@
 				"ms-azuretools.vscode-docker",
 				"KevinRose.vsc-python-indent",
 				"ms-python.vscode-python-envs",
-				"ms-python.debugpy"
+				"ms-python.debugpy",
+				"ritwickdey.LiveServer",
+				"samuelcolvin.jinjahtml",
+				"donjayamanne.python-extension-pack"
 			]
 		}
 	},

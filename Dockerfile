@@ -1,57 +1,25 @@
-# =========================
-# Build stage
-# =========================
-FROM python:3.11-slim AS builder
-
-WORKDIR /app
-
-# Build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir --no-compile -r requirements.txt \
-    && find /usr/local -type f -name '*.pyc' -delete \
-    && find /usr/local -name '__pycache__' -type d -prune -exec rm -rf {} +
-
-# =========================
-# Runtime stage
-# =========================
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Runtime deps (gosu is required for UID/GID switching)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gosu \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy only runtime artifacts from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages \
-    /usr/local/lib/python3.11/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
-
-# Runtime configuration (UID/GID are overridable at runtime)
-ENV UID=1000 \
-    GID=1000 \
-    TARGET_24H=17 \
-    POP_LIMIT=500 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
-# Application files
-COPY . .
-
-# Entrypoint
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Create runtime directories (ownership fixed at startup)
-RUN mkdir -p /app/geonames /app/cities
+# For more information, please refer to https://aka.ms/vscode-docker-python
+FROM python:3-slim
 
 EXPOSE 8000
 
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED=1
+
+# Install pip requirements
+COPY requirements.txt .
+RUN python -m pip install -r requirements.txt
+
+WORKDIR /app
+COPY . /app
+
+# Creates a non-root user with an explicit UID and adds permission to access the /app folder
+# For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
+RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
+
+# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "-k", "uvicorn.workers.UvicornWorker", "api:app"]

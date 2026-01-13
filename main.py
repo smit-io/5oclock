@@ -1,38 +1,61 @@
-import os
-import logging
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.templating import Jinja2Templates
+import sys
+from src.constants import FILES_TO_DOWNLOAD, FORCE_UPDATE
+from src.downloader import sync_all_datasets
+from src.database import import_data
+from src.processor import (
+    get_cities_from_best_hour_match,
+    process_refined_data, 
+    create_timezone_specific_tables,
+)
+from src.exporter import export_all_timezones_to_json, export_list_to_json
 
-from src import download, database, city_finder
-import random
+def initialize_pipeline(force: bool = False):
+    """
+    One function to rule them all: 
+    Syncs data, builds the DB, partitions tables, and exports JSONs.
+    """
+    print("🚀 Starting GeoNames Pipeline Initialization...")
 
-# Lifespan event to handle startup tasks
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logging.info("Checking for data and database updates...")
+    # 1. Sync Remote Data (Downloads only if newer or forced)
+    print("\n[Step 1/5] Syncing remote datasets...")
+    sync_all_datasets(FILES_TO_DOWNLOAD, force=force)
+
+    # 2. Build Raw SQLite DB (Imports only if .txt files are newer)
+    print("\n[Step 2/5] Importing raw text data into geonames.db...")
+    import_data()
+
+    # 3. Build Refined cities.db (Joins and cleans data)
+    print("\n[Step 3/5] Generating refined cities.db (Master Tables)...")
+    process_refined_data()
+
+    # 4. Create Partitioned Timezone Tables
+    print("\n[Step 4/5] Creating individual tables for each timezone...")
+    create_timezone_specific_tables(force=force)
+
+    # 5. Export JSON Files
+    print("\n[Step 5/5] Exporting all timezones to JSON files...")
+    # Optional: pass a limit (e.g. 100) if you don't want massive JSON files
+    export_all_timezones_to_json(force=force)
+
+    print("\n✅ Initialization Pipeline Complete!")
+
+def main():
+    # You can pass 'force' as a command line argument if you want
+    force_flag = FORCE_UPDATE
+    if "--force" in sys.argv:
+        force_flag = True
+        
+    initialize_pipeline(force=force_flag)
     
-    # 1. Ensure data is downloaded
-    download.run_downloads()
-    
-    # 2. Build or update database if needed
-    # (The database.process_data script handles 'replace' or updates)
-    if not os.path.exists("cities.db"):
-        database.process_data("cities.db")
-    
-    logging.info("Startup complete. App is ready.")
-    yield
-    # Shutdown logic would go here if needed
+    target_hour = 17 
+    cities = get_cities_from_best_hour_match(target_hour, city_limit=100)
 
-app = FastAPI(lifespan=lifespan)
-templates = Jinja2Templates(directory="templates")
+    if cities:
+        export_list_to_json(
+            cities, 
+            filename=f"best_match_hour_{target_hour}", 
+            force=True
+        )
 
-@app.get("/")
-async def index(request: Request, hour: int = 17, pop: int = 50000):
-    cities = city_finder.find_cities(hour=hour, min_pop=pop)
-    selected_city = random.choice(cities) if cities else None
-    return templates.TemplateResponse("index.html", {
-        "request": request, 
-        "city": selected_city, 
-        "hour": hour
-    })
+if __name__ == "__main__":
+    main()

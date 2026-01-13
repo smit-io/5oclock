@@ -1,6 +1,4 @@
 __pycache__/
-.pytest_cache/
-geonames/
+data/
 .DS_Store
-tailwindcss
-._*
+.vscode/
