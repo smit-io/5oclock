@@ -77,7 +77,7 @@ def create_indexes():
     print("Creating database indexes for speed...")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pop ON cities(population DESC)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_tz ON cities(timezone_id)")
-    cursor.execute("CREATE INDEX idx_cities_display_search ON cities(population, name, country);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cities_display_search ON cities(population, name, country);")
     
     conn.commit()
     conn.close()

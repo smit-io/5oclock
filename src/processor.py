@@ -534,7 +534,7 @@ def get_cities_from_tz_table(timezone_name: str, limit: Optional[int] = None) ->
     # 2. Check if the table actually exists before querying
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
     if not cursor.fetchone():
-        print(f"Table '{table_name}' does not exist. Run create_timezone_specific_tables() first.")
+        print(f"Table '{table_name}' does not exist. ")
         conn.close()
         return []
 
@@ -590,39 +590,57 @@ def get_cities_from_best_hour_match(target_hour: int, city_limit: Optional[int] 
     return all_cities
 
 def get_round_robin_cities(target_hour: int):
-    """Retrieves cities for the target hour and organizes them by country."""
+    """Retrieves cities for the target hour and organizes them by country round-robin style."""
     from src.timezone_finder import find_best_matching_timezones_with_meta
     
     winning_meta = find_best_matching_timezones_with_meta(target_hour)
     if not winning_meta:
         return []
 
+    # Get the list of timezone strings (e.g., ['America/New_York', 'America/Detroit'])
+    target_timezones = list(winning_meta.keys())
+
+    conn = sqlite3.connect(CITIES_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
     # Group cities by country
     country_groups = {}
-    
-    for tz_name in winning_meta.keys():
-        # Using your existing DB fetcher
-        cities_in_tz = get_cities_from_tz_table(tz_name) 
-        
-        for city in cities_in_tz:
-            # city tuple: (name, state, country, pop, lat, lon, ...)
-            country = city[2]
-            if country not in country_groups:
-                country_groups[country] = []
-            country_groups[country].append({
-                "name": city[0],
-                "country": city[2]
-            })
 
-    # Shuffle each group internally
+    # Optimization: Use WHERE timezone_id IN (...) to fetch all cities in one go
+    placeholders = ', '.join(['?'] * len(target_timezones))
+    query = f"""
+        SELECT name, country 
+        FROM cities 
+        WHERE timezone_id IN ({placeholders})
+        ORDER BY population DESC
+    """
+    
+    cursor.execute(query, target_timezones)
+    rows = cursor.fetchall()
+    conn.close()
+
+    for row in rows:
+        country = row['country']
+        if country not in country_groups:
+            country_groups[country] = []
+        
+        country_groups[country].append({
+            "name": row['name'],
+            "country": country
+        })
+
+    # Shuffle each country's list internally for variety within the round-robin
     for country in country_groups:
         random.shuffle(country_groups[country])
 
     # Interleave (Round Robin)
     combined = []
+    # Convert lists to deques for efficient popping from the left
     queues = [deque(cities) for cities in country_groups.values()]
     
     while queues:
+        # We iterate over a copy of the list so we can remove empty deques while looping
         for q in list(queues):
             if q:
                 combined.append(q.popleft())
@@ -630,3 +648,45 @@ def get_round_robin_cities(target_hour: int):
                 queues.remove(q)
                 
     return combined
+
+# def get_round_robin_cities(target_hour: int):
+#     """Retrieves cities for the target hour and organizes them by country."""
+#     from src.timezone_finder import find_best_matching_timezones_with_meta
+    
+#     winning_meta = find_best_matching_timezones_with_meta(target_hour)
+#     if not winning_meta:
+#         return []
+
+#     # Group cities by country
+#     country_groups = {}
+    
+#     for tz_name in winning_meta.keys():
+#         # Using your existing DB fetcher
+#         cities_in_tz = get_cities_from_tz_table(tz_name) 
+        
+#         for city in cities_in_tz:
+#             # city tuple: (name, state, country, pop, lat, lon, ...)
+#             country = city[2]
+#             if country not in country_groups:
+#                 country_groups[country] = []
+#             country_groups[country].append({
+#                 "name": city[0],
+#                 "country": city[2]
+#             })
+
+#     # Shuffle each group internally
+#     for country in country_groups:
+#         random.shuffle(country_groups[country])
+
+#     # Interleave (Round Robin)
+#     combined = []
+#     queues = [deque(cities) for cities in country_groups.values()]
+    
+#     while queues:
+#         for q in list(queues):
+#             if q:
+#                 combined.append(q.popleft())
+#             else:
+#                 queues.remove(q)
+                
+#     return combined

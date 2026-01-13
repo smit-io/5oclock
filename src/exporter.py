@@ -1,8 +1,10 @@
 import json
+import os
 import sqlite3
 from typing import List, Tuple, Optional
 
 import pytz
+from tqdm import tqdm
 from src.constants import CITIES_DB_PATH, JSON_DIR, REFINED_SCHEMAS
 from src.processor import get_cities_from_tz_table, sanitize_table_name
 
@@ -62,31 +64,81 @@ def export_list_to_json(data: List[Tuple], filename: Optional[str] = None, force
     _handle_save(dict_data, filename, force)
     return json.dumps(dict_data)
 
+# def export_all_timezones_to_json(limit_per_tz: Optional[int] = None, force: bool = False):
+#     """
+#     Iterates through all timezones in the database and exports 
+#     each one as an individual JSON file.
+#     """
+#     conn = sqlite3.connect(CITIES_DB_PATH)
+#     cursor = conn.cursor()
+
+#     # Get all human-readable timezone names
+#     cursor.execute("SELECT timezone_name FROM iana_timezones")
+#     timezones = [row[0] for row in cursor.fetchall()]
+#     conn.close()
+
+#     print(f"Starting bulk JSON export for {len(timezones)} timezones...")
+
+#     for tz_name in timezones:
+#         # Get data using our partitioned table function for speed
+#         cities_data = get_cities_from_tz_table(tz_name, limit=limit_per_tz)
+        
+#         if cities_data:
+#             # Create a filename like "africa_cairo.json"
+#             filename = sanitize_table_name(tz_name).replace("tz_", "")
+#             export_list_to_json(cities_data, filename=filename, force=force)
+
+#     print("Bulk export complete.")
+    
 def export_all_timezones_to_json(limit_per_tz: Optional[int] = None, force: bool = False):
     """
-    Iterates through all timezones in the database and exports 
-    each one as an individual JSON file.
+    Iterates through all timezones and exports data from the master 'cities' table.
+    Uses the idx_cities_timezone index for high performance.
     """
     conn = sqlite3.connect(CITIES_DB_PATH)
+    # Allows us to handle results as dictionaries
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    # Get all human-readable timezone names
+    # 1. Get the list of all valid timezones to process
     cursor.execute("SELECT timezone_name FROM iana_timezones")
     timezones = [row[0] for row in cursor.fetchall()]
-    conn.close()
 
-    print(f"Starting bulk JSON export for {len(timezones)} timezones...")
+    print(f"🚀 Starting bulk JSON export for {len(timezones)} timezones...")
 
-    for tz_name in timezones:
-        # Get data using our partitioned table function for speed
-        cities_data = get_cities_from_tz_table(tz_name, limit=limit_per_tz)
+    # 2. Iterate through each timezone and query the indexed master table
+    for tz_name in tqdm(timezones, desc="Exporting JSONs", unit="tz"):
+        
+        # Define the output filename based on your previous logic
+        # Result: "tz_america_new_york" -> "america_new_york"
+        clean_filename = sanitize_table_name(tz_name).replace("tz_", "")
+        file_path = os.path.join(JSON_DIR, f"{clean_filename}.json")
+
+        # Skip if file exists and force is False
+        if os.path.exists(file_path) and not force:
+            continue
+
+        # 3. Query the master 'cities' table directly
+        query = """
+            SELECT name, state, country, population, latitude, longitude, timezone_id 
+            FROM cities 
+            WHERE timezone_id = ?
+            ORDER BY population DESC
+        """
+        
+        if limit_per_tz:
+            query += f" LIMIT {limit_per_tz}"
+
+        cursor.execute(query, (tz_name,))
+        
+        # Convert sqlite3.Row objects to list of dicts for JSON
+        cities_data = [dict(row) for row in cursor.fetchall()]
         
         if cities_data:
-            # Create a filename like "africa_cairo.json"
-            filename = sanitize_table_name(tz_name).replace("tz_", "")
-            export_list_to_json(cities_data, filename=filename, force=force)
+            # Reusing your existing helper to save the file
+            export_list_to_json(cities_data, filename=clean_filename, force=force)
 
-    print("Bulk export complete.")
+    conn.close()
 
 # def export_all_timezones_to_json(limit_per_tz: int = None, force: bool = False):
 #     """

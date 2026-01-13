@@ -27,14 +27,13 @@ def initialize_pipeline(force: bool = False):
     # 3. Build Refined cities.db (Joins and cleans data)
     print("\n[Step 3/5] Generating refined cities.db (Master Tables)...")
     process_refined_data()
+    
+    # 4. Creating indexes
+    print("\n[Step 4/5] Creating indexes for optimized queries...")
     create_indexes()
 
-    # 4. Create Partitioned Timezone Tables
-    print("\n[Step 4/5] Creating individual tables for each timezone...")
-    create_timezone_specific_tables(force=force)
-
     # 5. Export JSON Files
-    print("\n[Step 5/5] Exporting all timezones to JSON files...")
+    print("\n[Step 4/5] Exporting all timezones to JSON files...")
     # Optional: pass a limit (e.g. 100) if you don't want massive JSON files
     export_all_timezones_to_json(force=force)
 
