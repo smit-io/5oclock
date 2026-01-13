@@ -1,8 +1,7 @@
 services:
-  5oclock-static:
-    build:
-      context: .
-      dockerfile: Dockerfile.static
+  5oclock:
+    image: ghcr.io/smit-io/5oclock:static
+    container_name: 5oclock
     ports:
       - "8088:8043"
     restart: unless-stopped
