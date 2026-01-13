@@ -1,0 +1,8 @@
+services:
+  5oclock-static:
+    build:
+      context: .
+      dockerfile: Dockerfile.static
+    ports:
+      - "8088:8043"
+    restart: unless-stopped

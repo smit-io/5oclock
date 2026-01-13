@@ -116,16 +116,26 @@
             const now = moment();
             const matchingTimezones = [];
 
+            const tzInfos = [];
+            const targetTotal = (targetHour % 24) * 60;
+
             moment.tz.names().forEach(zone => {
-                if (now.clone().tz(zone).hour() === targetHour) {
-                    matchingTimezones.push({ name: zone, minute: now.clone().tz(zone).minute() });
-                }
+                const m = now.clone().tz(zone);
+                const localTotal = m.hour() * 60 + m.minute();
+                const diff = (localTotal - targetTotal + 1440) % 1440;
+                const distance = Math.min(diff, 1440 - diff); // distance in minutes to nearest HH:00
+                tzInfos.push({ name: zone, hour: m.hour(), minute: m.minute(), distance });
             });
 
-            if (matchingTimezones.length === 0) return;
+            console.log('Timezone distances to target hour:', tzInfos);
 
-            const minMinute = Math.min(...matchingTimezones.map(t => t.minute));
-            const bestZones = matchingTimezones.filter(t => t.minute === minMinute);
+            if (tzInfos.length === 0) return;
+
+            const minDistance = Math.min(...tzInfos.map(t => t.distance));
+            const bestZones = tzInfos.filter(t => t.distance === minDistance);
+
+            console.log('Minimum distance (min minutes):', minDistance);
+            console.log('Best Timezones (closest to HH:00):', bestZones);
 
             let combinedCities = [];
             for (const zone of bestZones) {

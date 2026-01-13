@@ -1,0 +1,6 @@
+FROM pierrezemb/gostatic
+
+COPY index.html /srv/http/index.html
+COPY data/json/ /srv/http/data/json/
+
+# EXPOSE 8043
