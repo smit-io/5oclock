@@ -1,191 +1,62 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>It's 5 O'Clock Somewhere</title>
-    <!-- Tailwind CSS CDN for development-->
-    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
-    <!-- Custom Styles -->
-    <link rel="stylesheet" href="./templates/style.css">
-    
+    <title>City Clock</title>
     <style>
-        @font-face {
-        font-family: 'Inter';
-        src: url('./templates/fonts/InterVariable.woff2') format('truetype');
-        font-weight: 100 900;
-        font-style: normal;
-        font-display: swap;
-        }
-        body {
-        font-family: 'Inter', sans-serif;
-        }
-</style>
-
+        body { margin: 0; background: #050505; color: white; font-family: 'Inter', sans-serif; 
+               display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #container { text-align: center; transition: opacity 1s; opacity: 1; }
+        .city { font-size: clamp(3rem, 10vw, 8rem); font-weight: 900; letter-spacing: -2px; line-height: 1; }
+        .country { font-size: 1.5rem; color: #666; margin-top: 1rem; text-transform: uppercase; letter-spacing: 4px; }
+        .clock { font-size: 1.2rem; margin-top: 2rem; font-family: monospace; color: #444; }
+        .fade-out { opacity: 0; }
+    </style>
 </head>
-<body class="bg-white text-black dark:bg-zinc-950 dark:text-zinc-100 h-screen flex items-center justify-center p-6 transition-all">
-
-    <div id="app" class="max-w-4xl w-full text-center">
-        <div id="loader" class="opacity-50 uppercase tracking-widest text-sm animate-pulse">
-            Calculating Global Happy Hour...
-        </div>
-
-        <div id="content" class="hidden">
-            <p id="dynamic-header" class="text-xs md:text-sm uppercase tracking-widest mb-4 opacity-50 dark:opacity-40">
-                It is currently --:-- -- in
-            </p>
-            
-            <h1 id="city-name" class="text-6xl md:text-9xl font-black uppercase leading-none break-words tracking-tighter mb-8">
-                ---
-            </h1>
-            
-            <div class="flex flex-col items-center justify-center gap-4">
-                <div class="flex flex-col md:flex-row items-center justify-center gap-4 text-xl md:text-2xl font-medium">
-                    <span id="real-time-clock" class="bg-black text-white dark:bg-zinc-100 dark:text-black px-4 py-1 tabular-nums">
-                        --:--:-- --
-                    </span>
-                    <span id="location-details" class="opacity-60">---</span>
-                </div>
-
-                <p id="population-display" class="text-sm uppercase tracking-widest mt-2 opacity-40 font-bold">
-                    Population: ---
-                </p>
-            </div>
-
-            <div class="mt-12 flex flex-col items-center gap-12">
-                <button onclick="findHappyHourCity()" 
-                        class="text-xs font-bold tracking-widest uppercase border-b-2 border-black dark:border-zinc-100 pb-1 hover:opacity-50 transition-all">
-                    FIND ANOTHER CITY
-                </button>
-
-                <div class="flex flex-wrap justify-center gap-x-6 gap-y-4 opacity-30 hover:opacity-100 transition-opacity duration-300">
-                    <a id="share-x" target="_blank" class="text-[10px] font-bold tracking-widest uppercase hover:underline">X (Twitter)</a>
-                    <a id="share-wa" target="_blank" class="text-[10px] font-bold tracking-widest uppercase hover:underline">WhatsApp</a>
-                    <a id="share-tg" target="_blank" class="text-[10px] font-bold tracking-widest uppercase hover:underline">Telegram</a>
-                    <a id="share-fb" target="_blank" class="text-[10px] font-bold tracking-widest uppercase hover:underline">Facebook</a>
-                    <button onclick="copyToClipboard()" class="text-[10px] font-bold tracking-widest uppercase hover:underline">Copy Link</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="error" class="hidden">
-            <h1 class="text-4xl font-black uppercase">No cities found</h1>
-            <p class="mt-4 opacity-50 text-sm">Adjust the population threshold or try again later.</p>
-        </div>
+<body>
+    <div id="container">
+        <div class="city" id="city">--</div>
+        <div class="country" id="country">--</div>
+        <div class="clock" id="clock">00:00:00</div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const DATA_URL = "https://raw.githubusercontent.com/smit-io/5oclock/refs/heads/main/cities/world_cities.json"; 
-        
-        // Get params from URL or use defaults
-        const urlParams = new URLSearchParams(window.location.search);
-        const TARGET_HOUR = parseInt(urlParams.get('hour')) || 17; 
-        const POP_LIMIT = parseInt(urlParams.get('pop')) || 500;
+        let cities = [];
+        let index = 0;
+        const targetHour = new URLSearchParams(window.location.search).get('target_hour') || 17;
 
-        let db = {};
-        let clockInterval = null;
-        let currentCity = null;
-
-        async function init() {
-            try {
-                const response = await fetch(DATA_URL);
-                if (!response.ok) throw new Error("Database not found");
-                db = await response.json();
-                findHappyHourCity();
-            } catch (err) {
-                console.error("Init Error:", err);
-                document.getElementById('loader').innerText = "Database error. Ensure cities/world_cities.json exists.";
-            }
+        async function fetchData() {
+            const res = await fetch(`/api/cities?target_hour=${targetHour}`);
+            cities = await res.json();
+            if (cities.length > 0 && index === 0) updateDisplay();
         }
 
-        function findHappyHourCity() {
-            const winners = [];
-            const tzMap = db.timezones ? db.timezones : db;
+        function updateDisplay() {
+            if (cities.length === 0) return;
+            const container = document.getElementById('container');
+            container.classList.add('fade-out');
 
-            for (const [tzId, locations] of Object.entries(tzMap)) {
-                try {
-                    const cityHour = new Intl.DateTimeFormat('en-US', {
-                        hour: 'numeric', hour12: false, timeZone: tzId
-                    }).format(new Date());
-
-                    if (parseInt(cityHour) === TARGET_HOUR) {
-                        locations.forEach(loc => {
-                            if (loc.population >= POP_LIMIT) {
-                                winners.push({ ...loc, timezone_id: tzId });
-                            }
-                        });
-                    }
-                } catch (e) { continue; }
-            }
-
-            if (winners.length > 0) {
-                currentCity = winners[Math.floor(Math.random() * winners.length)];
-                updateUI(currentCity);
-                startLiveClock(currentCity.timezone_id);
-            } else {
-                showError();
-            }
+            setTimeout(() => {
+                const city = cities[index % cities.length];
+                document.getElementById('city').innerText = city.name;
+                document.getElementById('country').innerText = city.country;
+                index++;
+                container.classList.remove('fade-out');
+            }, 1000);
         }
 
-        function updateUI(city) {
-            // 1. Dynamic Header (e.g., "It is currently 5:00 PM in")
-            const displayHour = TARGET_HOUR % 12 || 12;
-            const amPm = TARGET_HOUR >= 12 ? "PM" : "AM";
-            document.getElementById('dynamic-header').innerText = `It is currently ${displayHour}'o clock in`;
-
-            // 2. City & Location Details
-            document.getElementById('city-name').innerText = city.city;
-            document.getElementById('location-details').innerText = `${city.state}, ${city.country}`;
-            
-            // 3. Population with formatting
-            document.getElementById('population-display').innerText = `Population: ${city.population.toLocaleString()}`;
-
-            // 4. Social Share Links
-            const shareMsg = encodeURIComponent(`It's ${displayHour} o'clock in ${city.city}! 🍻`);
-            const currentUrl = encodeURIComponent(window.location.href);
-
-            document.getElementById('share-x').href = `https://twitter.com/intent/tweet?text=${shareMsg}&url=${currentUrl}`;
-            document.getElementById('share-wa').href = `https://api.whatsapp.com/send?text=${shareMsg}%20${currentUrl}`;
-            document.getElementById('share-tg').href = `https://t.me/share/url?url=${currentUrl}&text=${shareMsg}`;
-            document.getElementById('share-fb').href = `https://www.facebook.com/sharer/sharer.php?u=${currentUrl}`;
-
-            // Reveal Content
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('error').classList.add('hidden');
-            document.getElementById('content').classList.remove('hidden');
+        function updateClocks() {
+            if (cities.length === 0) return;
+            // Real-time local clock calculation
+            const city = cities[(index - 1) % cities.length];
+            const now = new Date();
+            const localStr = now.toLocaleTimeString('en-GB', { timeZone: city.timezone });
+            document.getElementById('clock').innerText = `${localStr} ${city.tz_abbr}`;
         }
 
-        function startLiveClock(timezone) {
-            if (clockInterval) clearInterval(clockInterval);
-            
-            const clockEl = document.getElementById('real-time-clock');
-            
-            const tick = () => {
-                const now = new Date();
-                const timeStr = new Intl.DateTimeFormat('en-US', {
-                    hour: 'numeric', minute: 'numeric', second: 'numeric',
-                    hour12: true, timeZone: timezone
-                }).format(now);
-                clockEl.innerText = timeStr;
-            };
-
-            tick(); // Initial call
-            clockInterval = setInterval(tick, 1000);
-        }
-
-        function copyToClipboard() {
-            navigator.clipboard.writeText(window.location.href);
-            alert("URL copied with settings!");
-        }
-
-        function showError() {
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('content').classList.add('hidden');
-            document.getElementById('error').classList.remove('hidden');
-        }
-
-        init();
+        fetchData();
+        setInterval(fetchData, 60000); // Refresh data every minute
+        setInterval(updateDisplay, 10000); // Rotate city every 10s
+        setInterval(updateClocks, 1000); // Update clock every second
     </script>
 </body>
 </html>

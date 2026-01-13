@@ -1,18 +1,18 @@
 import os
 
-TARGET_24H = int(os.getenv("TARGET_24H", 17))
-POP_LIMIT = int(os.getenv("POP_LIMIT", 500))
+FORCE_REBUILD = False
+DATA_DIR = "data"
+DB_NAME = "cities.db"
 
-# Directories
-DATA_DIR = "./geonames"
-OUTPUT_DIR = "./cities"
+GEONAMES_URLS = {
+    "cities": "https://download.geonames.org/export/dump/cities500.zip",
+    "countries": "https://download.geonames.org/export/dump/countryInfo.txt",
+    "admin1": "https://download.geonames.org/export/dump/admin1CodesASCII.txt"
+}
 
-# Files
-CITIES_FILE = os.path.join(DATA_DIR, "cities500.txt")
-ADMIN_FILE = os.path.join(DATA_DIR, "admin1CodesASCII.txt")
-DB_PATH = os.path.join(OUTPUT_DIR, "world_cities.json")
-SQLITE_DB_PATH = os.path.join(OUTPUT_DIR, "world_cities.db")
-
-# URLs
-CITIES_URL = "https://download.geonames.org/export/dump/cities500.zip"
-ADMIN_URL = "https://download.geonames.org/export/dump/admin1CodesASCII.txt"
+FILES = {
+    "cities_zip": os.path.join(DATA_DIR, "cities500.zip"),
+    "cities_txt": os.path.join(DATA_DIR, "cities500.txt"),
+    "countries": os.path.join(DATA_DIR, "countryInfo.txt"),
+    "admin1": os.path.join(DATA_DIR, "admin1CodesASCII.txt")
+}
