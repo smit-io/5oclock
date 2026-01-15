@@ -1,0 +1,7 @@
+FROM pierrezemb/gostatic
+
+COPY index.html /src/http/index.html
+COPY json/timezones/ /src/http/json/timezones/
+COPY dist/ /src/http/dist/
+
+EXPOSE 8043

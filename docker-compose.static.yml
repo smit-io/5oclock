@@ -1,0 +1,7 @@
+services:
+  service:
+    image: 5oclock:static
+    container_name: 5oclock_static
+    restart: unless-stopped
+    ports:
+      - 8043:8043
