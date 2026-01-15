@@ -1,3 +1,4 @@
+# TODO: create a fastapi endpoint and fix this. Currently it won't work. Only minor changes required, env variables etc.
 # =========================
 # Build stage
 # =========================

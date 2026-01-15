@@ -1,7 +1,8 @@
+# TODO: create a fastapi endpoint and fix this. Currently it won't work.
 services:
   5oclock:
-    image: 5oclock:user
-    container_name: 5oclock_user
+    image: 5oclock:latest
+    container_name: 5oclock
     ports:
       - "8000:8000"
     environment:
