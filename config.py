@@ -18,3 +18,5 @@ CITIES_ZIP = DATA_DIR / "cities500.zip"
 ADMIN1_FILE = DATA_DIR / "admin1CodesASCII.txt"
 COUNTRY_FILE = DATA_DIR / "countryInfo.txt"
 CITIES_FILE = DATA_DIR / "cities500.txt"
+
+TIMEZONE_INDEX_FILE_NAME = "timezone.json"

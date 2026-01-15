@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from cities_db.models import City, IANATimezone
 
-from config import FORCE_REBUILD
+from config import FORCE_REBUILD, TIMEZONE_INDEX_FILE_NAME
 
 
 def safe_tz_filename(tz_name: str) -> str:
@@ -117,7 +117,7 @@ def generate_timezone_index(output_dir: Path):
     for which JSON files exist.
     """
 
-    index_path = output_dir / "_timezone.json"
+    index_path = output_dir / TIMEZONE_INDEX_FILE_NAME
 
     # Skip if already exists and no rebuild requested
     if index_path.exists() and not FORCE_REBUILD:
@@ -126,7 +126,7 @@ def generate_timezone_index(output_dir: Path):
     timezones: List[str] = []
 
     for path in sorted(output_dir.glob("*.json")):
-        if path.name == "_timezone.json":
+        if path.name == TIMEZONE_INDEX_FILE_NAME:
             continue
 
         timezones.append(tz_name_from_filename(path.name))
