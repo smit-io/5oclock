@@ -1,33 +1,41 @@
-# TimeFinder 🌍⏰
+# TimeFinder 🌍⏰🍻
 
-**Build a local, timezone-aware city dataset and find cities around the world by local hour.**
+**Because it’s always 5 o’clock somewhere.**
 
-TimeFinder ingests **GeoNames** data, normalizes it into optimized SQLite databases, exports static timezone-based JSON files, and supports powerful queries like:
+TimeFinder started as a way to answer something that isn’t really a question:
 
-> *“Which cities in the world are currently at 5 PM?”*
+> **“It’s 5 o’clock somewhere.”**
 
-This project is **data-first**, **DST-safe**, and designed for **fast local querying** and **frontend-friendly exports**.
+What began as a curiosity quickly turned into a deeper exploration of **timezones, geography, population data**, and the surprisingly interesting towns and cities that rarely make it onto maps.
 
----
+Over time, the idea expanded:
 
-## What This Project Does
+* Not just **5 PM**, but **any hour**
+* Not just major cities, but **lesser-known towns**
+* Not just trivia, but **accurate, DST-safe data**
 
-* Downloads and parses **GeoNames** datasets
-* Builds two SQLite databases:
-
-  * `geonames.db` (raw source-of-truth)
-  * `cities.db` (query-optimized)
-* Builds a canonical **IANA timezone table**
-* Finds cities at a given local hour (DST-safe)
-* Optionally applies **round-robin fairness**
-* Exports **static JSON files per timezone**
-* Generates a `_timezone.index` for fast frontend loading
+This project became a way to **learn geography through time** 🌐🕰️.
 
 ---
 
-## Project Structure
+## ✨ What This Project Does
 
-```
+* 📥 Downloads and parses **GeoNames** datasets
+* 🗄️ Builds optimized **SQLite databases**
+* 🕒 Answers questions like:
+
+  * *Which cities are currently at 17:00?*
+  * *What towns are waking up right now?*
+* 🌎 Correctly handles **DST and timezone quirks**
+* ⚖️ Supports **round-robin fairness** across countries
+* 📦 Exports **static JSON per timezone**
+* 🚀 Designed for **frontend-friendly consumption**
+
+---
+
+## 📁 Project Structure
+
+```text
 .
 ├── main.py                     # Entry point (build + query orchestration)
 ├── config.py                   # Global configuration & flags
@@ -80,48 +88,77 @@ This project is **data-first**, **DST-safe**, and designed for **fast local quer
 
 ---
 
-## Databases
+## 🚀 Quick Start (Docker)
 
-### `geonames.db` (Raw)
+The easiest way to get started is with Docker.
 
-Contains unmodified GeoNames data:
+### 🐳 Docker Compose
 
-* Cities
-* Countries
-* Admin divisions
-* Population data
+```yaml
+services:
+  service:
+    image: ghcr.io/smit-io/5oclock:static
+    container_name: 5oclock_static
+    restart: unless-stopped
+    ports:
+      - 8043:8043
+```
 
-This database is **never queried directly by the app logic**.
+Then run:
+
+```bash
+docker compose up -d
+```
+
+Visit:
+
+```text
+http://localhost:8043
+```
+
+🍻 You’re now exploring cities around the world by time.
+
+---
+
+## 🗄️ Databases
+
+### `geonames.db` (Raw Source)
+
+* Raw GeoNames imports
+* Countries, admin divisions, cities
+* Never queried directly by app logic
 
 ---
 
 ### `cities.db` (Optimized)
 
-Purpose-built for fast queries:
+Purpose-built for queries:
 
-* `iana_timezones`
 * `cities`
+* `iana_timezones`
 
 Each city:
 
-* Is linked to **one IANA timezone**
-* Stores population, lat/lng, country, admin info
-* Does **not** store UTC offsets (computed dynamically)
+* 🌍 Belongs to exactly **one IANA timezone**
+* 📍 Stores lat/lng
+* 👥 Stores population
+* ⏱️ Does **not** store UTC offsets
 
 ---
 
-## Why Offsets Are Not Stored
+## 🕒 Why Offsets Are Not Stored
 
-UTC offsets change due to **DST**.
+UTC offsets change because of **DST**.
 
 Instead:
 
-* Offsets are calculated at query time using `zoneinfo`
-* This guarantees correctness year-round
+* Offsets are computed dynamically using `zoneinfo`
+* Ensures correctness year-round
+* Avoids stale data bugs ❌
 
 ---
 
-## Core Queries
+## 🔍 Core Queries
 
 ### Cities at a given hour
 
@@ -135,7 +172,7 @@ With limit:
 cities_at_hour(session, hour=17, limit=50)
 ```
 
-With optional round-robin fairness:
+With round-robin fairness:
 
 ```python
 cities_at_hour(
@@ -155,108 +192,86 @@ cities_in_timezone(session, "America/New_York")
 
 ---
 
-## Round-Robin Fairness (Optional)
+## ⚖️ Round-Robin Fairness
 
 Without fairness:
 
-```
-USA, USA, USA, USA, Canada, Mexico
+```text
+USA, USA, USA, Canada, Mexico
 ```
 
 With round-robin by country:
 
-```
-USA, Canada, Mexico, USA, USA, USA
+```text
+USA, Canada, Mexico, USA, USA
 ```
 
-* Applied **at query time**
+* Applied **only at query time**
 * Never baked into storage or exports
-* Can be turned on/off per call
+* Optional and configurable
 
 ---
 
-## Static JSON Export
+## 📦 Static JSON Export
 
-For frontend usage, cities are exported as:
+Generated files:
 
-```
+```text
 json/timezones/
 ├── America_New_York.json
 ├── Europe_London.json
 ├── Asia_Kolkata.json
-└── _timezone.index
+└── timezone.json
 ```
 
-Each file:
+Each timezone file:
 
-* Represents **one timezone**
-* Groups cities by country
-* Sorted by population (descending)
-* Generated only if missing or `FORCE_REBUILD=true`
-
----
-
-## `_timezone.index`
-
-Automatically generated list of all available timezone JSON files.
-
-Used by frontends to:
-
-* Discover supported timezones
-* Avoid filesystem scanning
+* 📄 One timezone per file
+* 🌎 Cities grouped by country
+* 📊 Sorted by population
+* 🔁 Regenerated only if missing or forced
 
 ---
 
-## Build Flow (main.py)
+## 🗂️ `timezone.json`
 
-1. Download GeoNames files (if newer)
-2. Build `geonames.db`
-3. Build `cities.db`
-4. Extract unique IANA timezones
-5. Run sanity checks
-6. Export timezone JSON
-7. Generate `_timezone.index`
-8. Run queries (optional)
+* Lists all available timezone JSON files
+* Enables fast frontend discovery
+* Avoids directory scans
 
 ---
 
-## Configuration
+## 🧠 Design Philosophy
 
-All global flags live in `config.py`, including:
-
-* `FORCE_REBUILD`
-* Data paths
-* Export locations
-
----
-
-## Performance
-
-* Indexed SQLite tables
-* Population-sorted inserts
-* Optional limits on queries
-* Round-robin runs in **O(n)**
+* ✅ Correctness over shortcuts
+* 🕰️ DST-safe by design
+* 📦 Static where possible
+* 🔍 Explicit over magic
+* 🌍 Geography-first mindset
 
 ---
 
-## Requirements
+## 🛣️ Roadmap
 
-* Python **3.10+**
-* SQLite
-* Key dependencies:
+Planned improvements and ideas:
 
-  * `sqlalchemy`
-  * `requests`
-  * `pytz` / `zoneinfo`
-
----
-
-## Design Principles
-
-* **Correctness > cleverness**
-* **DST-safe by design**
-* **No hidden magic**
-* **Separation of concerns**
-* **Frontend-ready outputs**
+* 🚀 **FastAPI API layer**
+  * Query cities by hour via HTTP
+  * Optional filters (population, country)
+* 🎄 **Structured logging**
+  * Build-time logs
+  * Query diagnostics
+* 🧪 More tests & validation
+* 📊 Additional metadata (regions, hemispheres)
+* 🗺️ Visualizations & maps
 
 ---
+
+## ❤️ Why This Exists
+
+This project exists because:
+
+* Timezones are fascinating
+* Geography is underrated
+* Small towns matter
+* “It’s 5 o’clock somewhere” deserved a real answer
