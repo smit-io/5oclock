@@ -5,21 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>It's 5 O'Clock Somewhere</title>
     <!-- Tailwind CSS CDN for development-->
-    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    <!--- <script src="https://cdn.tailwindcss.com"></script> --->
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="./templates/style.css">
+    <link href="/static/styles.css" rel="stylesheet">
     
     <style>
-        @font-face {
-        font-family: 'Inter';
-        src: url('./templates/fonts/InterVariable.woff2') format('truetype');
-        font-weight: 100 900;
-        font-style: normal;
-        font-display: swap;
-        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
         body {
-        font-family: 'Inter', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
+
+        .fade {
+            transition:
+                opacity 280ms cubic-bezier(0.4, 0, 0.2, 1),
+                transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: opacity, transform;
+        }
+
+        .fade.is-hidden {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+
+
+
+        .fade.hidden {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+
+
 </style>
 
 </head>
@@ -35,28 +52,49 @@
                 It is currently --:-- -- in
             </p>
             
-            <h1 id="city-name" class="text-6xl md:text-9xl font-black uppercase leading-none break-words tracking-tighter mb-8">
+            <h1
+                id="city-name"
+                class="text-6xl md:text-9xl font-black uppercase leading-none break-words
+                        tracking-tighter mb-8
+                        transition-all duration-500 ease-out
+                        will-change-[transform,filter]
+                        min-h-[6rem]"
+            >
                 ---
             </h1>
             
             <div class="flex flex-col items-center justify-center gap-4">
                 <div class="flex flex-col md:flex-row items-center justify-center gap-4 text-xl md:text-2xl font-medium">
-                    <span id="real-time-clock" class="bg-black text-white dark:bg-zinc-100 dark:text-black px-4 py-1 tabular-nums">
-                        --:--:-- --
+                    
+                    <span
+                        id="location-details"
+                        class="fade opacity-60
+                                transition-all duration-500 ease-out
+                                will-change-[transform,filter]
+                                min-h-[1.5rem]"
+                        >
+                        ---
                     </span>
-                    <span id="location-details" class="opacity-60">---</span>
                 </div>
-
-                <p id="population-display" class="text-sm uppercase tracking-widest mt-2 opacity-40 font-bold">
+                <p
+                    id="population-display"
+                    class="fade text-sm uppercase tracking-widest mt-2 opacity-40 font-bold
+                            transition-all duration-500 ease-out
+                            will-change-[transform,filter]
+                            min-h-[1.25rem]"
+                    >
                     Population: ---
-                </p>
+                    </p>
+                <span id="real-time-clock" class="bg-black md:text-2xl dark:bg-zinc-100 dark:text-black px-4 py-1 tabular-nums">
+                        --:--:-- --
+                </span>
             </div>
 
             <div class="mt-12 flex flex-col items-center gap-12">
-                <button onclick="findHappyHourCity()" 
+                <!--- <button onclick="findHappyHourCity()" 
                         class="text-xs font-bold tracking-widest uppercase border-b-2 border-black dark:border-zinc-100 pb-1 hover:opacity-50 transition-all">
                     FIND ANOTHER CITY
-                </button>
+                </button> --->
 
                 <div class="flex flex-wrap justify-center gap-x-6 gap-y-4 opacity-30 hover:opacity-100 transition-opacity duration-300">
                     <a id="share-x" target="_blank" class="text-[10px] font-bold tracking-widest uppercase hover:underline">X (Twitter)</a>
@@ -75,117 +113,290 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const DATA_URL = "https://raw.githubusercontent.com/smit-io/5oclock/refs/heads/main/cities/world_cities.json"; 
-        
-        // Get params from URL or use defaults
-        const urlParams = new URLSearchParams(window.location.search);
-        const TARGET_HOUR = parseInt(urlParams.get('hour')) || 17; 
-        const POP_LIMIT = parseInt(urlParams.get('pop')) || 500;
-
-        let db = {};
-        let clockInterval = null;
-        let currentCity = null;
-
-        async function init() {
-            try {
-                const response = await fetch(DATA_URL);
-                if (!response.ok) throw new Error("Database not found");
-                db = await response.json();
-                findHappyHourCity();
-            } catch (err) {
-                console.error("Init Error:", err);
-                document.getElementById('loader').innerText = "Database error. Ensure cities/world_cities.json exists.";
+        function log(scope, message, data = null) {
+            const time = new Date().toISOString();
+            if (data) {
+                console.log(`[${time}] [${scope}] ${message}`, data);
+            } else {
+                console.log(`[${time}] [${scope}] ${message}`);
             }
         }
 
-        function findHappyHourCity() {
-            const winners = [];
-            const tzMap = db.timezones ? db.timezones : db;
+        function fadeSwap(elements, updateFn) {
+            // Fade out
+            elements.forEach(el => el.classList.add("is-hidden"));
 
-            for (const [tzId, locations] of Object.entries(tzMap)) {
-                try {
-                    const cityHour = new Intl.DateTimeFormat('en-US', {
-                        hour: 'numeric', hour12: false, timeZone: tzId
-                    }).format(new Date());
+            setTimeout(() => {
+                updateFn();
 
-                    if (parseInt(cityHour) === TARGET_HOUR) {
-                        locations.forEach(loc => {
-                            if (loc.population >= POP_LIMIT) {
-                                winners.push({ ...loc, timezone_id: tzId });
-                            }
-                        });
-                    }
-                } catch (e) { continue; }
-            }
+                // Force layout sync (important)
+                elements.forEach(el => el.offsetHeight);
 
-            if (winners.length > 0) {
-                currentCity = winners[Math.floor(Math.random() * winners.length)];
-                updateUI(currentCity);
-                startLiveClock(currentCity.timezone_id);
-            } else {
+                // Fade back in
+                elements.forEach(el => el.classList.remove("is-hidden"));
+            }, 280); // MUST match CSS duration
+        }
+
+
+        /* ---------------- CONFIG ---------------- */  
+
+        const TIMEZONE_BASE_URL = "./json/timezones/";
+        const INDEX_FILE = "_timezone.json";
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const TARGET_HOUR = parseInt(urlParams.get("hour")) || 17;
+
+        const CITY_ROTATE_INTERVAL = 10_000;   // 10 seconds
+        const DATA_REFRESH_INTERVAL = 60_000;  // 60 seconds
+
+        /* ---------------- STATE ---------------- */
+
+        let activeTimezones = [];
+        let citiesPool = [];
+        {{/*  let currentCityIndex = 0;  */}}
+
+        let cityRotateTimer = null;
+        let dataRefreshTimer = null;
+        let clockTimer = null;
+
+        let cityQueue = [];
+        let currentCityIndex = 0;
+
+        let rotateTimer = null;
+        const ROTATE_INTERVAL = 10_000; // 10 seconds
+
+
+        /* ---------------- INIT ---------------- */
+
+        async function init() {
+            log("INIT", "Starting app");
+            try {
+                const index = await fetchJSON(TIMEZONE_BASE_URL + INDEX_FILE);
+                log("INIT", "Loaded timezone index", index.timezones.length);
+
+                const matchingTZs = findMatchingTimezones(index.timezones);
+                log("TIMEZONE", "Matching target hour", matchingTZs);
+
+                activeTimezones = filterClosestToHour(matchingTZs);
+                log("TIMEZONE", "Closest timezones selected", activeTimezones);
+
+                await loadCitiesForTimezones(activeTimezones);
+                log("DATA", "Cities loaded", citiesPool.length);
+
+                showCity(0);
+                startCityRotation();
+                startBackgroundRefresh();
+            } catch (err) {
+                log("ERROR", "Initialization failed", err);
                 showError();
             }
         }
 
-        function updateUI(city) {
-            // 1. Dynamic Header (e.g., "It is currently 5:00 PM in")
-            const displayHour = TARGET_HOUR % 12 || 12;
-            const amPm = TARGET_HOUR >= 12 ? "PM" : "AM";
-            document.getElementById('dynamic-header').innerText = `It is currently ${displayHour}'o clock in`;
 
-            // 2. City & Location Details
-            document.getElementById('city-name').innerText = city.city;
-            document.getElementById('location-details').innerText = `${city.state}, ${city.country}`;
-            
-            // 3. Population with formatting
-            document.getElementById('population-display').innerText = `Population: ${city.population.toLocaleString()}`;
+        /* ---------------- TIMEZONE LOGIC ---------------- */
 
-            // 4. Social Share Links
-            const shareMsg = encodeURIComponent(`It's ${displayHour} o'clock in ${city.city}! 🍻`);
-            const currentUrl = encodeURIComponent(window.location.href);
+        function findMatchingTimezones(timezones) {
+            const now = new Date();
+            const matches = [];
 
-            document.getElementById('share-x').href = `https://twitter.com/intent/tweet?text=${shareMsg}&url=${currentUrl}`;
-            document.getElementById('share-wa').href = `https://api.whatsapp.com/send?text=${shareMsg}%20${currentUrl}`;
-            document.getElementById('share-tg').href = `https://t.me/share/url?url=${currentUrl}&text=${shareMsg}`;
-            document.getElementById('share-fb').href = `https://www.facebook.com/sharer/sharer.php?u=${currentUrl}`;
+            for (const tz of timezones) {
+                try {
+                    const parts = new Intl.DateTimeFormat("en-US", {
+                        hour: "numeric",
+                        minute: "numeric",
+                        hour12: false,
+                        timeZone: tz,
+                    }).formatToParts(now);
 
-            // Reveal Content
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('error').classList.add('hidden');
-            document.getElementById('content').classList.remove('hidden');
+                    const hour = parseInt(parts.find(p => p.type === "hour").value);
+                    const minute = parseInt(parts.find(p => p.type === "minute").value);
+
+                    if (hour === TARGET_HOUR) {
+                        const distance = Math.min(minute, 60 - minute);
+                        matches.push({ tz, minute, distance });
+                        log("TIMEZONE MATCH", tz, minute, distance)
+                    }
+                } catch {}
+            }
+
+            return matches;
         }
 
-        function startLiveClock(timezone) {
-            if (clockInterval) clearInterval(clockInterval);
-            
-            const clockEl = document.getElementById('real-time-clock');
-            
+        function filterClosestToHour(matches) {
+            if (!matches.length) return [];
+
+            const minDistance = Math.min(...matches.map(m => m.distance));
+            return matches
+                .filter(m => m.distance === minDistance)
+                .map(m => m.tz);
+        }
+
+        /* ---------------- DATA LOADING ---------------- */
+
+        async function loadCitiesForTimezones(timezones) {
+            const temp = [];
+
+            for (const tz of timezones) {
+                const safeName = tz.replace("/", "_") + ".json";
+                const data = await fetchJSON(TIMEZONE_BASE_URL + safeName);
+
+                for (const [country, cities] of Object.entries(data.countries)) {
+                    for (const city of cities) {
+                        temp.push({
+                            ...city,
+                            country,
+                            timezone: tz,
+                        });
+                    }
+                }
+            }
+
+            // ✅ Apply round-robin fairness ONCE
+            citiesPool = roundRobinShuffle(temp, "country");
+
+            console.log(`Cities loaded: ${citiesPool.length}`);
+        }
+
+
+        function roundRobinShuffle(items, key) {
+            const buckets = new Map();
+
+            // Group
+            items.forEach(item => {
+                const k = item[key];
+                if (!buckets.has(k)) buckets.set(k, []);
+                buckets.get(k).push(item);
+            });
+
+            const result = [];
+
+            while (buckets.size > 0) {
+                for (const [k, arr] of buckets) {
+                if (arr.length > 0) {
+                    result.push(arr.shift());
+                }
+                if (arr.length === 0) {
+                    buckets.delete(k);
+                }
+                }
+            }
+
+            return result;
+            }
+
+
+        /* ---------------- UI ---------------- */
+
+        function showCity(index) {
+            const city = citiesPool[index];
+            if (!city) return;
+
+            log("UI", "Rotating city", {
+                city: city.city,
+                timezone: city.timezone
+            });
+
+            const cityEl = document.getElementById("city-name");
+            const locationEl = document.getElementById("location-details");
+            const populationEl = document.getElementById("population-display");
+
+            fadeSwap(
+                [cityEl, locationEl, populationEl],
+                () => {
+                    cityEl.innerText = city.city;
+                    locationEl.innerText = `${city.state}, ${city.country}`;
+                    populationEl.innerText =
+                        `Population: ${city.population.toLocaleString()}`;
+                }
+            );
+
+            startClock(city.timezone);
+
+            document.getElementById("dynamic-header").innerText =
+                `It is currently ${TARGET_HOUR % 12 || 12} o'clock in`;
+
+            document.getElementById("loader").classList.add("hidden");
+            document.getElementById("content").classList.remove("hidden");
+        }
+
+
+        /* ---------------- CLOCK ---------------- */
+
+        function startClock(timezone) {
+            if (clockTimer) clearInterval(clockTimer);
+
+            const el = document.getElementById("real-time-clock");
+
             const tick = () => {
-                const now = new Date();
-                const timeStr = new Intl.DateTimeFormat('en-US', {
-                    hour: 'numeric', minute: 'numeric', second: 'numeric',
-                    hour12: true, timeZone: timezone
-                }).format(now);
-                clockEl.innerText = timeStr;
+                el.innerText = new Intl.DateTimeFormat("en-US", {
+                    hour: "numeric",
+                    minute: "numeric",
+                    second: "numeric",
+                    hour12: true,
+                    timeZone: timezone,
+                }).format(new Date());
             };
 
-            tick(); // Initial call
-            clockInterval = setInterval(tick, 1000);
+            tick();
+            clockTimer = setInterval(tick, 1000);
         }
 
-        function copyToClipboard() {
-            navigator.clipboard.writeText(window.location.href);
-            alert("URL copied with settings!");
+        /* ---------------- ROTATION ---------------- */
+
+        function startCityRotation() {
+            if (cityRotateTimer) clearInterval(cityRotateTimer);
+
+            log("ROTATION", "Starting city rotation");
+
+            cityRotateTimer = setInterval(() => {
+                currentCityIndex = (currentCityIndex + 1) % citiesPool.length;
+                showCity(currentCityIndex);
+            }, CITY_ROTATE_INTERVAL);
+        }
+
+
+
+
+        /* ---------------- BACKGROUND REFRESH ---------------- */
+
+        function startBackgroundRefresh() {
+            if (dataRefreshTimer) clearInterval(dataRefreshTimer);
+
+            log("REFRESH", "Starting background refresh loop");
+
+            dataRefreshTimer = setInterval(async () => {
+                try {
+                    log("REFRESH", "Refreshing city data");
+                    const index = await fetchJSON(TIMEZONE_BASE_URL + INDEX_FILE);
+                    const matchingTZs = findMatchingTimezones(index.timezones);
+                    activeTimezones = filterClosestToHour(matchingTZs);
+                    await loadCitiesForTimezones(activeTimezones);
+                    currentCityIndex = 0;
+                    log("REFRESH", "Refresh complete", citiesPool.length);
+                } catch (e) {
+                    log("REFRESH_ERROR", "Background refresh failed", e);
+                }
+            }, DATA_REFRESH_INTERVAL);
+        }
+
+
+        /* ---------------- HELPERS ---------------- */
+
+        async function fetchJSON(url) {
+            const r = await fetch(url, { cache: "no-store" });
+            if (!r.ok) throw new Error(`Failed to load ${url}`);
+            return r.json();
         }
 
         function showError() {
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('content').classList.add('hidden');
-            document.getElementById('error').classList.remove('hidden');
+            document.getElementById("loader").classList.add("hidden");
+            document.getElementById("error").classList.remove("hidden");
         }
 
+        /* ---------------- START ---------------- */
+
         init();
-    </script>
+</script>
+
 </body>
 </html>
