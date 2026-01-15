@@ -113,6 +113,7 @@ def build_cities_db():
 
     rebuild_db_if_needed(CITIES_DB_PATH)
 
+    geo_session, geo_engine = create_session(GEONAMES_DB_PATH)
     city_session, city_engine = create_session(CITIES_DB_PATH)
 
     # Create tables
