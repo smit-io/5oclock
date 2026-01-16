@@ -1,7 +1,0 @@
-FROM pierrezemb/gostatic
-
-COPY index.html /srv/http/index.html
-COPY json/timezones/ /srv/http/json/timezones/
-COPY dist/ /srv/http/dist/
-
-EXPOSE 8043
