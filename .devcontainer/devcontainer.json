@@ -22,10 +22,7 @@
 	"forwardPorts": [8000],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": [
-		"pip3 install --user -r requirements.txt",
-		"npm install"
-	],
+	"postCreateCommand": "bash -lc 'pip3 install --user -r requirements.txt && npm install'",
 
 	// Configure tool-specific properties.
 	"customizations": {
