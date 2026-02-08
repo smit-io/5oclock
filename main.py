@@ -220,7 +220,7 @@ def main():
     print("🚀 Starting TimeFinder build pipeline")
     init()
     print("🤘 Build pipeline complete")
-    some_data()
+    # some_data()
 
 
 

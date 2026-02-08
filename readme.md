@@ -275,3 +275,10 @@ This project exists because:
 * Geography is underrated
 * Small towns matter
 * “It’s 5 o’clock somewhere” deserved a real answer
+
+---
+
+## Dev Setup
+
+* Run `npm run init` to download the data
+* Open `index.html` for the static webpage

@@ -9,7 +9,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "postcss dist/input.css -o dist/styles.css --watch",
-    "build": "postcss dist/input.css -o dist/styles.css"
+    "build": "postcss dist/input.css -o dist/styles.css",
+    "init": "python main.py"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.18",
