@@ -12,7 +12,8 @@
 			"version": "lts",
 			"pnpmVersion": "none",
 			"nvmVersion": "latest"
-		}
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
@@ -40,6 +41,12 @@
 			]
 		}
 	},
+	// "mounts": [
+	// 		"source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind"
+	// 	],
+	// 	"remoteEnv": {
+	// 		"SSH_AUTH_SOCK": "/ssh-agent"
+	// 	},
 
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	"remoteUser": "vscode"
