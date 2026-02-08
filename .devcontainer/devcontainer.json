@@ -35,7 +35,8 @@
 				"KevinRose.vsc-python-indent",
 				"ms-python.vscode-python-envs",
 				"ms-python.debugpy",
-				"ritwickdey.LiveServer"
+				"ritwickdey.LiveServer",
+				"vscjava.migrate-java-to-azure"
 			]
 		}
 	},

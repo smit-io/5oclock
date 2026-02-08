@@ -180,7 +180,7 @@
                 activeTimezones = filterClosestToHour(matchingTZs);
                 log("TIMEZONE", "Closest timezones selected", activeTimezones);
 
-                await loadCitiesForTimezones(activeTimezones);
+                citiesPool = await loadCitiesForTimezones(activeTimezones);
                 log("DATA", "Cities loaded", citiesPool.length);
 
                 showCity(0);
@@ -252,9 +252,10 @@
             }
 
             // ✅ Apply round-robin fairness ONCE
-            citiesPool = roundRobinShuffle(temp, "country");
+            const result = roundRobinShuffle(temp, "country");
 
-            console.log(`Cities loaded: ${citiesPool.length}`);
+            console.log(`Cities loaded: ${result.length}`);
+            return result;
         }
 
 
@@ -283,6 +284,19 @@
 
             return result;
             }
+
+        // Create a compact signature for a pool for cheap comparison
+        function poolSignature(pool) {
+            if (!pool) return "";
+            return pool.map(c => `${c.city}|||${c.country}|||${c.timezone}|||${c.population}`).join("\n");
+        }
+
+        function poolsEqual(a, b) {
+            if (!a && !b) return true;
+            if (!a || !b) return false;
+            if (a.length !== b.length) return false;
+            return poolSignature(a) === poolSignature(b);
+        }
 
 
         /* ---------------- UI ---------------- */
@@ -369,10 +383,21 @@
                     log("REFRESH", "Refreshing city data");
                     const index = await fetchJSON(TIMEZONE_BASE_URL + INDEX_FILE);
                     const matchingTZs = findMatchingTimezones(index.timezones);
-                    activeTimezones = filterClosestToHour(matchingTZs);
-                    await loadCitiesForTimezones(activeTimezones);
-                    currentCityIndex = 0;
-                    log("REFRESH", "Refresh complete", citiesPool.length);
+                    const newActive = filterClosestToHour(matchingTZs);
+
+                    // Load candidate pool but don't apply until we detect changes
+                    const newPool = await loadCitiesForTimezones(newActive);
+
+                    if (poolsEqual(citiesPool, newPool)) {
+                        log("REFRESH", "No changes detected — skipping update");
+                    } else {
+                        log("REFRESH", "Changes detected — applying update", newPool.length);
+                        activeTimezones = newActive;
+                        citiesPool = newPool;
+                        currentCityIndex = 0;
+                        showCity(0);
+                        startCityRotation();
+                    }
                 } catch (e) {
                     log("REFRESH_ERROR", "Background refresh failed", e);
                 }
